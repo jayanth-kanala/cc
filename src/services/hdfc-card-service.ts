@@ -1,8 +1,9 @@
 export class HdfcCardService implements CardFetchService {
-    private static readonly ICICI_URL = 'https://acquisition-1.americanexpress.com/api/acquisition/digital/v1/shop/us/cardshop-api/api/v1/intl/content/compare-cards/in/default';
+    private static readonly HDFC_CC = 'https://acquisition-1.americanexpress.com/api/acquisition/digital/v1/shop/us/cardshop-api/api/v1/intl/content/compare-cards/in/default';
   
     async fetchCards(): Promise<Card[]> {
-      const response = await fetch(HdfcCardService.ICICI_URL);
+      return [] as Card[]
+      const response = await fetch(HdfcCardService.HDFC_CC);
       const data = await response.json();
   
       return data.map((card: any) => ({

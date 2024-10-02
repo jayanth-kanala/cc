@@ -3,7 +3,7 @@
 import { Router, Request, Response } from 'express';
 import { Banks } from '../models/banks.js';
 import { BANK_NAMES } from '../constants/bank.js';
-import { AmexCardService } from '../services/amex-card-service.js';
+import { BankCardController } from '../controllers/bank-card-controller.js';
 
 const router = Router();
 
@@ -44,10 +44,10 @@ router.delete('/:id', (req: Request, res: Response) => {
 
 // GET /banks/:id/cards
 router.get('/:id/cards', async (req: Request, res: Response) => {
-    let amexCardService = new AmexCardService();
-    let output = await amexCardService.fetchCards()
-    // res.json(testCardType())
+    const bankCardController = new BankCardController();
+    let output = await bankCardController.fetchCards(req, res);
     res.json(output)
+    // res.json(testCardType())
 });
 
 export default router;

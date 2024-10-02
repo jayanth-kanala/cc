@@ -2,6 +2,7 @@ export class IciciCardService implements CardFetchService {
     private static readonly ICICI_URL = 'https://acquisition-1.americanexpress.com/api/acquisition/digital/v1/shop/us/cardshop-api/api/v1/intl/content/compare-cards/in/default';
   
     async fetchCards(): Promise<Card[]> {
+      return [] as Card[]
       const response = await fetch(IciciCardService.ICICI_URL);
       const data = await response.json();
   
