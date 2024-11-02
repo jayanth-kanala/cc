@@ -1,22 +1,59 @@
+import { CreditCard } from "../credit-card.js";
+import { Issuer } from "../enums/issuer.enum.js";
+import { AnnualFee, Benefit, CardNetwork, CardType, EligibilityCriteria, RewardStrategy } from "../interface/credit-card.interface.js";
+import { CardFetchService } from "./card-fetch-service.js";
+
 export class AmexCardService implements CardFetchService {
-  private static readonly AMEX_URL = 'https://acquisition-1.americanexpress.com/api/acquisition/digital/v1/shop/us/cardshop-api/api/v1/intl/content/compare-cards/in/default';
+  private static readonly AMEX_URL = 'https://dainternationalshop.americanexpress.com/us/cardshop-api/api/v1/intl/content/compare-cards/in/default';
 
-  async fetchCards(): Promise<Card[]> {
-    const response = await fetch(AmexCardService.AMEX_URL);
-    const data = await response.json();
+  async fetchCards(): Promise<CreditCard[]> {
+    try {
+      const response = await fetch(AmexCardService.AMEX_URL);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data: AmericanExpressResponseInterface[] = await response.json();
+      return this.mapApiCardsToCreditCards(data);
+    } catch (error) {
+      console.error('Error fetching credit cards:', error);
+      throw error;
+    }
+  }
 
-    return data.map((card: any) => ({
+  mapApiCardsToCreditCards(cards: AmericanExpressResponseInterface[]): CreditCard[] {
+    return cards.map((card) => this.mapApiCardToCreditCard(card));
+  }
+
+  mapApiCardToCreditCard(card: AmericanExpressResponseInterface): CreditCard {
+    return {
       id: card.productCode,
-      name: card.productName.replace(/&nbsp;/g, ' '),
-      type: card.cardType,
-      annualFee: [AmexCardService.extractFee(card.cardInfo, 1), AmexCardService.extractFee(card.cardInfo, 2)],
-      rewards: AmexCardService.extractRewards(card.benefits),
-      highlights: AmexCardService.extractHighlights(card.highlights),
-      benefits: AmexCardService.extractBenefits(card.benefits),
-      eligibility: AmexCardService.extractEligibility(card.eligibility).map(s => this.removeBrTags(s)),
-      bank: 'American Express',
-      imageUrl: card.cardImageURL
-    }));
+      name: this.extractCardName(card.productName),
+      type: this.extractCardType(card.cardType),
+      issuer: Issuer.American_Express,
+      network: CardNetwork.AmericanExpress,
+      annualFee: this.mapCardInfoToAnnualFee(card.cardInfo),
+      highlights: this.extractHighlights(card.highlights),
+      benefits: this.extractBenefits(card.benefits),
+      rewards: [],
+      rewardStrategy: RewardStrategy.Travel,
+      imageUrl: card.cardImageURL,
+      eligibility: this.mapEligibilityCriteria(card.eligibility),
+    };
+  }
+
+  extractCardName(productName: string) {
+    return productName.replace(/&nbsp;/g, ' ');
+  }
+
+  extractCardType(cardType: string) {
+    switch (cardType) {
+      case 'Credit Card':
+        return CardType.Credit
+      case 'Charge Card':
+        return CardType.Charge
+      default:
+        return CardType.Credit
+    }
   }
 
   private removeBrTags(htmlString: string): string {
@@ -24,38 +61,67 @@ export class AmexCardService implements CardFetchService {
     return htmlString.replace(/<br\s*\/?>/gi, '');
   }
 
-  // Mark helper methods as static since they don't need instance-specific data
-  private static extractFee(cardInfo: any[], id: number): string {
-    const feeInfo = cardInfo.find(info => info.id === id);
-    return feeInfo?.description?.find((desc: any) => desc.isTooltip === "N")?.descriptionCopy || "N/A";
-  }
+  private mapCardInfoToAnnualFee(cardInfo: AmericanExpressResponseInterface['cardInfo']): AnnualFee {
+    const annualFee: AnnualFee = {
+      description: [],
+      firstYear: 0,
+      secondYear: 0,
+      subsequentYears: 0
+    };
 
-  private static extractRewards(benefits: any[]): string[] {
-    const rewards = benefits.find(b => b.title === "Rewards");
-    return rewards?.benefitList?.flatMap((reward: any) =>
-      reward.details?.flatMap((detail: any) =>
-        detail.description?.map((desc: any) => desc.descriptionCopy))) || [];
+    cardInfo.forEach((info) => {
+      info.description.forEach((desc) => {
+        if (desc.descriptionCopy) {
+          annualFee.description.push(desc.descriptionCopy)
+          const match = desc.descriptionCopy.match(/([0-9,]+)/);
+          if (match) {
+            const amount = parseInt(match[0].replace(',', ''), 10);
+            if (desc.descriptionCopy.toLowerCase().includes('first year')) {
+              annualFee.firstYear = amount;
+            } else if (desc.descriptionCopy.toLowerCase().includes('second year')) {
+              annualFee.secondYear = amount;
+            }
+            if (desc.descriptionCopy.toLowerCase().includes('second year onwards')) {
+              annualFee.subsequentYears = amount;
+            }
+          }
+        }
+      });
+    });
+    return annualFee;
   }
-
-  private static extractHighlights(highlights: any[]): string[] {
+  
+  private extractHighlights(highlights: any[]): string[] {
     return highlights
       .filter(highlight => highlight.applicable)
       .flatMap(highlight => highlight.description.map((desc: any) => desc.descriptionCopy));
   }
 
-  private static extractBenefits(benefits: any[]): string[] {
-    return benefits.flatMap((benefit: any) =>
-      benefit.benefitList?.flatMap((item: any) =>
-        item.details?.flatMap((detail: any) =>
-          detail.description.map((desc: any) => desc.descriptionCopy)
-        )
-      )
-    ) || [];
+  private extractBenefits(benefits: AmericanExpressResponseInterface['benefits']): Benefit[] {
+    return benefits.flatMap((benefit) =>
+      benefit.benefitList.map((subBenefit) => ({
+        title: benefit.title === 'Rewards' ? subBenefit.title : `${benefit.title} - ${subBenefit.title}`,
+        description: subBenefit.details.flatMap((detail) =>
+          detail.description.map((desc) => desc.descriptionCopy)
+        ),
+      }))
+    );
   }
 
-  private static extractEligibility(eligibility: any[]): string[] {
-    return eligibility.flatMap(e =>
-      e.description.map((desc: any) => desc.descriptionCopy)
-    ) || [];
+  private mapEligibilityCriteria(eligibility: AmericanExpressResponseInterface['eligibility']): EligibilityCriteria {
+    const criteria = eligibility[0].description.map((desc) => desc.descriptionCopy);
+    const income = criteria.find((criterion) => criterion.includes('annual income'))?.match(/Rs\. (\d+) Lacs/)?.[1];
+    const age = criteria.find((criterion) => criterion.includes('years of age'))?.match(/over (\d+) years/)?.[1];
+    const residency = criteria.find((criterion) => criterion.includes('residential address'))?.match(/current\/permanent residential address in (.*)/)?.[1]||'';
+    // Assuming no credit score requirement mentioned in the eligibility criteria
+    const creditScore = 0;
+    return {
+      income: income ? parseInt(income, 10) * 100000 : 0,
+      creditScore,
+      age: age ? parseInt(age, 10) : 0,
+      residency,
+      description: criteria
+    };
   }
+
 }

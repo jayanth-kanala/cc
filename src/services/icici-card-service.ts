@@ -1,23 +1,21 @@
+import { CreditCard } from "../credit-card.js";
+import { CardFetchService } from "./card-fetch-service.js";
+
 export class IciciCardService implements CardFetchService {
     private static readonly ICICI_URL = 'https://acquisition-1.americanexpress.com/api/acquisition/digital/v1/shop/us/cardshop-api/api/v1/intl/content/compare-cards/in/default';
   
-    async fetchCards(): Promise<Card[]> {
-      return [] as Card[]
-      const response = await fetch(IciciCardService.ICICI_URL);
-      const data = await response.json();
-  
-      return data.map((card: any) => ({
-        id: card.productCode,
-        name: card.productName.replace(/&nbsp;/g, ' '),
-        type: card.cardType,
-        annualFee: [IciciCardService.extractFee(card.cardInfo, 1), IciciCardService.extractFee(card.cardInfo, 2)],
-        rewards: IciciCardService.extractRewards(card.benefits),
-        highlights: IciciCardService.extractHighlights(card.highlights),
-        benefits: IciciCardService.extractBenefits(card.benefits),
-        eligibility: IciciCardService.extractEligibility(card.eligibility).map(s => this.removeBrTags(s)),
-        bank: 'American Express',
-        imageUrl: card.cardImageURL
-      }));
+    async fetchCards(): Promise<CreditCard[]> {
+      try {
+        const response = await fetch(IciciCardService.ICICI_URL);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        return []
+      } catch (error) {
+        console.error('Error fetching credit cards:', error);
+        throw error;
+      }
     }
   
     private removeBrTags(htmlString: string): string {

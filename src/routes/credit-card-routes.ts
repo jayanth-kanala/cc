@@ -2,7 +2,6 @@
 
 import { Router, Request, Response } from 'express';
 import { AmexCardService } from '../services/amex-card-service.js';
-import creditCardType from 'credit-card-type';
 
 const router = Router();
 
@@ -10,18 +9,8 @@ const router = Router();
 router.get('/', async (req: Request, res: Response) => {
     let amexCardService = new AmexCardService();
     let output = await amexCardService.fetchCards()
-    // res.json(testCardType())
     res.json(output)
 });
-
-// function testCardType() {
-
-//     // The card number provided should be normalized prior to usage here.
-//     var visaCards = creditCardType("378282246310005");
-//     console.log(visaCards[0].type); // 'visa'
-
-//     return [visaCards]
-// }
 
 // GET /users/:id
 router.get('/:id', (req: Request, res: Response) => {

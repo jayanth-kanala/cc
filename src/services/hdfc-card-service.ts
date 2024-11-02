@@ -1,25 +1,23 @@
+import { CreditCard } from "../credit-card.js";
+import { CardFetchService } from "./card-fetch-service.js";
+
 export class HdfcCardService implements CardFetchService {
-    private static readonly HDFC_CC = 'https://acquisition-1.americanexpress.com/api/acquisition/digital/v1/shop/us/cardshop-api/api/v1/intl/content/compare-cards/in/default';
-  
-    async fetchCards(): Promise<Card[]> {
-      return [] as Card[]
-      const response = await fetch(HdfcCardService.HDFC_CC);
-      const data = await response.json();
-  
-      return data.map((card: any) => ({
-        id: card.productCode,
-        name: card.productName.replace(/&nbsp;/g, ' '),
-        type: card.cardType,
-        annualFee: [HdfcCardService.extractFee(card.cardInfo, 1), HdfcCardService.extractFee(card.cardInfo, 2)],
-        rewards: HdfcCardService.extractRewards(card.benefits),
-        highlights: HdfcCardService.extractHighlights(card.highlights),
-        benefits: HdfcCardService.extractBenefits(card.benefits),
-        eligibility: HdfcCardService.extractEligibility(card.eligibility).map(s => this.removeBrTags(s)),
-        bank: 'American Express',
-        imageUrl: card.cardImageURL
-      }));
+    private static readonly HDFC_CC = 'https://www.hdfcbank.com/content/api/contentstream-id/723fb80a-2dde-42a3-9793-7ae1be57c87f/fcd086e6-1eea-434d-bc34-1fe637011169';
+
+    async fetchCards(): Promise<CreditCard[]> {
+      try {
+        const response = await fetch(HdfcCardService.HDFC_CC);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        return []
+      } catch (error) {
+        console.error('Error fetching credit cards:', error);
+        throw error;
+      }
     }
-  
+
     private removeBrTags(htmlString: string): string {
       // Use a regular expression to replace all <br> tags (with or without attributes)
       return htmlString.replace(/<br\s*\/?>/gi, '');
